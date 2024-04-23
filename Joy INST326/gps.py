@@ -1,0 +1,167 @@
+import sys
+import argparse
+from typing import Dict, List, Tuple, Optional
+
+class City:
+    """Represents a city with a name and neighbors."""
+    
+    def __init__(self, name: str):
+        """
+        Initializes a City instance.
+
+        Args:
+            name (str): The name of the city.
+        """
+        self.name = name
+        self.neighbors: Dict['City', Tuple[int, str]] = {}  # neighbors represented as a dictionary
+
+    def __repr__(self):
+        """Returns the city's name."""
+        return self.name
+
+    def add_neighbor(self, neighbor: 'City', distance: int, interstate: str):
+        """
+        Adds a neighbor city along with the distance and interstate connecting them.
+
+        Args:
+            neighbor (City): The neighbor city.
+            distance (int): The distance to the neighbor city.
+            interstate (str): The interstate connecting the two cities.
+        """
+        # Adds neighbor only if it doesn't already exist
+        if neighbor not in self.neighbors:
+            self.neighbors[neighbor] = (distance, interstate)
+
+class Map:
+    """Stores the map data as a graph where nodes are cities."""
+    
+    def __init__(self, relationships: Dict[str, List[Tuple[str, int, str]]]):
+        """
+        Initializes a Map instance.
+
+        Args:
+            relationships (dict): A dictionary mapping city names to their neighbors.
+        """
+        self.cities: Dict[str, City] = {}  # Initializes an empty dictionary to store city objects
+        for city_name, neighbors in relationships.items():
+            if city_name not in self.cities:
+                self.cities[city_name] = City(city_name)
+            for neighbor_name, distance, interstate in neighbors:
+                if neighbor_name not in self.cities:
+                    self.cities[neighbor_name] = City(neighbor_name)
+                self.cities[city_name].add_neighbor(self.cities[neighbor_name], distance, interstate)
+
+    def __repr__(self):
+        """Returns a comma-separated list of cities in the map."""
+        return ', '.join([city for city in self.cities])
+
+def bfs(graph: Map, start: str, goal: str) -> Optional[List[str]]:
+    """
+    Implements the BFS algorithm to find the shortest path between two cities.
+    Args:
+        graph (Map): The map object representing the graph.
+        start (str): The starting city.
+        goal (str): The goal city.
+    Returns:
+        Optional[List[str]]: The shortest path from start to goal, if exists.
+    """
+    explored = set()
+    queue = [([start], 0)]  # Initializes the queue with the start city and a total distance of 0
+
+    while queue:
+        path, _ = queue.pop(0)  # Gets the first path from the queue
+        node = path[-1]  # The current city is the last city in the path
+
+        if node not in explored:
+            neighbours = graph.cities[node].neighbors
+            for neighbour, (distance, _) in neighbours.items():
+                new_path = list(path)
+                new_path.append(neighbour.name)  # Append the neighbor's name
+                if neighbour.name == goal:
+                    return new_path  # Return the path as a list of city names
+                queue.append((new_path, distance))
+            explored.add(node)
+
+    print("Path not found")
+    return None
+
+def main(start: str, destination: str, connections: Dict[str, List[Tuple[str, int, str]]]):
+    """
+    Creates a Map object and finds the shortest path from start to destination.
+    Args:
+        start (str): The start city.
+        destination (str): The destination city.
+        connections (dict): The city connections data.
+    """
+    road_map = Map(connections)  # Creates the map
+    path = bfs(road_map, start, destination)  # Finds the shortest path using BFS
+    if path is None:
+        print("No path found from {} to {}.".format(start, destination))
+        return
+
+    instructions = ""  # To store the driving instructions
+    for i, city_name in enumerate(path[:-1]):
+        next_city_name = path[i + 1]
+        current_city = road_map.cities[city_name]
+        next_city = road_map.cities[next_city_name]
+        distance, interstate = current_city.neighbors[next_city]
+        instructions += f"Drive {distance} miles on {interstate} towards {next_city_name}, then\n"
+
+    instructions += "You will arrive at your destination\n"
+    print(instructions)
+
+def parse_args(args_list):
+    """Takes a list of strings from the command prompt and passes them through as arguments
+    
+    Args:
+        args_list (list) : the list of strings from the command prompt
+    Returns:
+        args (ArgumentParser)
+    """
+
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument('--starting_city', type = str, help = 'The starting city in a route.')
+    parser.add_argument('--destination_city', type = str, help = 'The destination city in a route.')
+    
+    args = parser.parse_args(args_list)
+    
+    return args
+
+if __name__ == "__main__":
+    
+    connections = {  
+        "Baltimore": [("Washington", 39, "95"), ("Philadelphia", 106, "95")],
+        "Washington": [("Baltimore", 39, "95"), ("Fredericksburg", 53, "95"), ("Bedford", 137, "70")], 
+        "Fredericksburg": [("Washington", 53, "95"), ("Richmond", 60, "95")],
+        "Richmond": [("Charlottesville", 71, "64"), ("Williamsburg", 51, "64"), ("Durham", 151, "85")],
+        "Durham": [("Richmond", 151, "85"), ("Raleigh", 29, "40"), ("Greensboro", 54, "40")],
+        "Raleigh": [("Durham", 29, "40"), ("Wilmington", 129, "40"), ("Richmond", 171, "95")],
+        "Greensboro": [("Charlotte", 92, "85"), ("Durham", 54, "40"), ("Ashville", 173, "40")],
+        "Ashville": [("Greensboro", 173, "40"), ("Charlotte", 130, "40"), ("Knoxville", 116, "40"), ("Atlanta", 208, "85")],
+        "Charlotte": [("Atlanta", 245, "85"), ("Ashville", 130, "40"), ("Greensboro", 92, "85")],
+        "Jacksonville": [("Atlanta", 346, "75"), ("Tallahassee", 164, "10"), ("Daytona Beach", 86, "95")],
+        "Daytona Beach": [("Orlando", 56, "4"), ("Miami", 95, "268")],
+        "Orlando": [("Tampa", 94, "4"), ("Daytona Beach", 56, "4")],
+        "Tampa": [("Miami", 281, "75"), ("Orlando", 94, "4"), ("Atlanta", 456, "75"), ("Tallahassee", 243, "98")],
+        "Atlanta": [("Charlotte", 245, "85"), ("Ashville", 208, "85"), ("Chattanooga", 118, "75"), ("Macon", 83, "75"), ("Tampa", 456, "75"), ("Jacksonville", 346, "75"), ("Tallahassee", 273, "27") ],
+        "Chattanooga": [("Atlanta", 118, "75"), ("Knoxville", 112, "75"), ("Nashville", 134, "24"), ("Birmingham", 148, "59")],
+        "Knoxville": [("Chattanooga", 112,"75"), ("Lexington", 172, "75"), ("Nashville", 180, "40"), ("Ashville", 116, "40")],
+        "Nashville": [("Knoxville", 180, "40"), ("Chattanooga", 134, "24"), ("Birmingam", 191, "65"), ("Memphis", 212, "40"), ("Louisville", 176, "65")],
+        "Louisville": [("Nashville", 176, "65"), ("Cincinnati", 100, "71"), ("Indianapolis", 114, "65"), ("St. Louis", 260, "64"), ("Lexington", 78, "64") ],
+        "Cincinnati": [("Louisville", 100, "71"), ("Indianapolis,", 112, "74"), ("Columbus", 107, "71"), ("Lexington", 83, "75"), ("Detroit", 263, "75")],
+        "Columbus": [("Cincinnati", 107, "71"), ("Indianapolis", 176, "70"), ("Cleveland", 143, "71"), ("Pittsburgh", 185, "70")],
+        "Detroit": [("Cincinnati", 263, "75"), ("Chicago", 283, "94"), ("Mississauga", 218, "401")],
+        "Cleveland":[("Chicago", 344, "80"), ("Columbus", 143, "71"), ("Youngstown", 75, "80"), ("Buffalo", 194, "90")],
+        "Youngstown":[("Pittsburgh", 67, "76")],
+        "Indianapolis": [("Columbus", 175, "70"), ("Cincinnati", 112, "74"), ("St. Louis", 242, "70"), ("Chicago", 183, "65"), ("Louisville", 114, "65"), ("Mississauga", 498, "401")],
+        "Pittsburg": [("Columbus", 185, "70"), ("Youngstown", 67, "76"), ("Philadelphia", 304, "76"), ("New York", 391, "76"), ("Bedford", 107, "76")],
+        "Bedford": [("Pittsburg", 107, "76")], #COMEBACK
+        "Chicago": [("Indianapolis", 182, "65"), ("St. Louis", 297, "55"), ("Milwaukee", 92, "94"), ("Detroit", 282, "94"), ("Cleveland", 344, "90")],
+        "New York": [("Philadelphia", 95, "95"), ("Albany", 156, "87"), ("Scranton", 121, "80"), ("Providence,", 95, "181"), ("Pittsburgh", 389, "76")],
+        "Scranton": [("Syracuse", 130, "81")],
+        "Philadelphia": [("Washington", 139, "95"), ("Pittsburgh", 305, "76"), ("Baltimore", 101, "95"), ("New York", 95, "95")]
+    }
+    
+    args = parse_args(sys.argv[1:])
+    main(args.starting_city, args.destination_city, connections)
